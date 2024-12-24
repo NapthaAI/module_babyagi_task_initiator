@@ -1,15 +1,14 @@
 from dotenv import load_dotenv
 from babyagi_task_initiator.schemas import (
     InputSchema,
-    TaskInitiatorPromptSchema,
-    Task,
-    TaskList
+    TaskInitiatorPromptSchema
 )
 from naptha_sdk.schemas import AgentDeployment, AgentRunInput
 from naptha_sdk.utils import get_logger
 import json
-import os
 from litellm import completion
+import asyncio
+
 load_dotenv()
 logger = get_logger(__name__)
 
@@ -18,8 +17,6 @@ class TaskInitiatorAgent:
         self.agent_deployment = agent_deployment
 
         self.user_message_template = """
-                Here’s an improved version of your prompt:
-
                 You are given the following task: {{task}}. The goal is to accomplish the following objective: {{objective}}.
 
                 Instructions:
@@ -31,7 +28,7 @@ class TaskInitiatorAgent:
                 Ensure that the result field reflects the actual outcome of the task after completion, and the done field accurately represents the task's status.
                 """
 
-    def generate_tasks(self, inputs: InputSchema) -> str:
+    async def generate_tasks(self, inputs: InputSchema) -> str:
         user_prompt = self.user_message_template.replace(
             "{{objective}}",
             inputs.tool_input_data.objective
@@ -50,51 +47,32 @@ class TaskInitiatorAgent:
 
         # Prepare LLM configuration
         llm_config = self.agent_deployment.agent_config.llm_config
-        api_key = None if llm_config.client == "ollama" else ("EMPTY" if llm_config.client == "vllm" else os.getenv("OPENAI_API_KEY"))
 
-        task = Task(name="Write a blog post", description="Write a blog post about the weather in London.", done=False, result="")
+        input_ = {
+            "messages": messages,
+            "model": llm_config.model,
+            "temperature": llm_config.temperature,
+            "max_tokens": llm_config.max_tokens
+        }
 
-        # Make LLM call
-        response = completion(
-            model=llm_config.model,
-            messages=messages,
-            temperature=llm_config.temperature,
-            max_tokens=llm_config.max_tokens,
-            api_base=llm_config.api_base,
-            api_key=api_key,
-            response_format=TaskList
+        response = await naptha.node.run_inference(
+            input_
         )
-            
-        # Parse the response content into tasks
-        response_content = response.choices[0].message.content
-        try:
-            print(response_content)
-            response_content = json.loads(response_content)
-            # Extract the list of tasks
-            tasks_data = response_content.get("list", [])
-            
-            # Ensure tasks_data is a list of dictionaries
-            if not isinstance(tasks_data, list) or not all(isinstance(task, dict) for task in tasks_data):
-                raise ValueError("Invalid task structure: Expected a list of dictionaries in 'list' key.")
-            
-            # Create Task objects
-            tasks = TaskList(list=[
-                Task(**task) for task in tasks_data
-            ])
-            
-            # Log and return the tasks as JSON
-            logger.info(f"Generated Tasks: {tasks.model_dump_json()}")
-            return tasks.model_dump_json()
-        except json.JSONDecodeError:
-            logger.error(f"Failed to parse response as JSON: {response_content}")
-            # Return an empty task list if parsing fails
-            return TaskList().model_dump_json()
 
-def run(agent_run: AgentRunInput, *args, **kwargs):
+        try:
+            response_content = response['choices'][0]['message']['content']
+            return response_content
+        
+        except (json.JSONDecodeError, KeyError) as e:
+            logger.error(f"Failed to parse response: {response}. Error: {e}")
+            return
+        
+
+async def run(agent_run: AgentRunInput, *args, **kwargs):
     logger.info(f"Running with inputs {agent_run.inputs.tool_input_data}")
     task_initiator_agent = TaskInitiatorAgent(agent_run.agent_deployment)
     method = getattr(task_initiator_agent, agent_run.inputs.tool_name, None)
-    return method(agent_run.inputs)
+    return await method(agent_run.inputs)
 
 if __name__ == "__main__":
     from naptha_sdk.client.naptha import Naptha
@@ -126,5 +104,5 @@ if __name__ == "__main__":
     )
 
     # Run the agent
-    response = run(agent_run)
+    response = asyncio.run(run(agent_run))
     logger.info(f"Final Response: {response}")

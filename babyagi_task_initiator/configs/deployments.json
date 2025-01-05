@@ -2,8 +2,8 @@
     {
         "name": "agent_deployment_1",
         "module": {"name": "babyagi_task_initiator"},
-        "worker_node_url": "ws://localhost:7002",
-        "agent_config": {
+        "node": {"ip": "localhost"},
+        "config": {
             "config_name": "agent_config_1",
             "llm_config": {"config_name": "model_1"},
             "persona_module" : null,

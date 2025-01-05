@@ -41,12 +41,12 @@ class TaskInitiatorAgent:
 
         # Prepare messages
         messages = [
-            {"role": "system", "content": json.dumps(self.agent_deployment.agent_config.system_prompt)},
+            {"role": "system", "content": json.dumps(self.agent_deployment.config.system_prompt)},
             {"role": "user", "content": user_prompt}
         ]
 
         # Prepare LLM configuration
-        llm_config = self.agent_deployment.agent_config.llm_config
+        llm_config = self.agent_deployment.config.llm_config
 
         input_ = {
             "messages": messages,
@@ -60,7 +60,7 @@ class TaskInitiatorAgent:
         )
 
         try:
-            response_content = response['choices'][0]['message']['content']
+            response_content = response.choices[0].message.content
             return response_content
         
         except (json.JSONDecodeError, KeyError) as e:
@@ -70,22 +70,23 @@ class TaskInitiatorAgent:
 
 async def run(agent_run: AgentRunInput, *args, **kwargs):
     logger.info(f"Running with inputs {agent_run.inputs.tool_input_data}")
-    task_initiator_agent = TaskInitiatorAgent(agent_run.agent_deployment)
+    task_initiator_agent = TaskInitiatorAgent(agent_run.deployment)
     method = getattr(task_initiator_agent, agent_run.inputs.tool_name, None)
     return await method(agent_run.inputs)
 
 if __name__ == "__main__":
     from naptha_sdk.client.naptha import Naptha
-    from naptha_sdk.configs import load_agent_deployments
+    from naptha_sdk.configs import setup_module_deployment
+    import os
 
     naptha = Naptha()
     
     # Load agent deployments
-    agent_deployments = load_agent_deployments(
-        "babyagi_task_initiator/configs/agent_deployments.json",
-        load_persona_data=False,
-        load_persona_schema=False
-    )
+    deployment = asyncio.run(setup_module_deployment("agent", "babyagi_task_initiator/configs/deployments.json", node_url = os.getenv("NODE_URL")))
+
+    deployment = AgentDeployment(**deployment.model_dump())
+
+    print("BabyAGI Task Initiator Deployment:", deployment)
 
     # Prepare input parameters
     input_params = InputSchema(
@@ -99,7 +100,7 @@ if __name__ == "__main__":
     # Create agent run input
     agent_run = AgentRunInput(
         inputs=input_params,
-        agent_deployment=agent_deployments[0],
+        deployment=deployment,
         consumer_id=naptha.user.id,
     )
 

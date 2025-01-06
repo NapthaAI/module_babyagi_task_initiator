@@ -82,7 +82,7 @@ if __name__ == "__main__":
     naptha = Naptha()
     
     # Load agent deployments
-    deployment = asyncio.run(setup_module_deployment("agent", "babyagi_task_initiator/configs/deployments.json", node_url = os.getenv("NODE_URL")))
+    deployment = asyncio.run(setup_module_deployment("agent", "babyagi_task_initiator/configs/deployment.json", node_url = os.getenv("NODE_URL")))
 
     deployment = AgentDeployment(**deployment.model_dump())
 

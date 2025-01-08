@@ -14,7 +14,7 @@ from babyagi_task_initiator.schemas import TaskList
 load_dotenv()
 logger = get_logger(__name__)
 
-class TaskInitiatorAgent:
+class BabyAGITaskInitiator:
     def __init__(self, deployment: AgentDeployment):
         self.deployment = deployment
         self.node = InferenceClient(self.deployment.node)
@@ -34,11 +34,11 @@ class TaskInitiatorAgent:
     async def generate_tasks(self, inputs: InputSchema) -> str:
         user_prompt = self.user_message_template.replace(
             "{{objective}}",
-            inputs["tool_input_data"]["objective"]
+            inputs.tool_input_data.objective
         )
 
         # Prepare context if available
-        context = inputs["tool_input_data"]["context"]
+        context = inputs.tool_input_data.context
         if context:
             user_prompt += f"\nContext: {context}"
 
@@ -75,7 +75,7 @@ class TaskInitiatorAgent:
         )
 
         try:
-            response_content = response.choices[0].message.content
+            response_content = response["choices"][0]["message"]["content"]
             return response_content
         
         except (json.JSONDecodeError, KeyError) as e:
@@ -83,11 +83,12 @@ class TaskInitiatorAgent:
             return
         
 
-async def run(module_run: Dict):
+async def run(module_run: Dict, *args, **kwargs):
     module_run = AgentRunInput(**module_run)
-    logger.info(f"Running with inputs {module_run.inputs['tool_input_data']}")
+    module_run.inputs = InputSchema(**module_run.inputs)
+    logger.info(f"Running with inputs {module_run.inputs.tool_name}")
     task_initiator_agent = TaskInitiatorAgent(module_run.deployment)
-    method = getattr(task_initiator_agent, module_run.inputs['tool_name'], None)
+    method = getattr(task_initiator_agent, module_run.inputs.tool_name, None)
     return await method(module_run.inputs)
 
 if __name__ == "__main__":
@@ -101,8 +102,6 @@ if __name__ == "__main__":
     # Load agent deployments
     deployment = asyncio.run(setup_module_deployment("agent", "babyagi_task_initiator/configs/deployment.json", node_url = os.getenv("NODE_URL")))
 
-    deployment = AgentDeployment(**deployment.model_dump())
-
     print("BabyAGI Task Initiator Deployment:", deployment)
 
     # Prepare input parameters
@@ -115,7 +114,7 @@ if __name__ == "__main__":
     }
 
     # Create agent run input as a dictionary
-    agent_run: Dict = {
+    module_run: Dict = {
         "inputs": input_params,
         "deployment": deployment,
         "consumer_id": naptha.user.id,
@@ -123,5 +122,5 @@ if __name__ == "__main__":
     }
 
     # Run the agent
-    response = asyncio.run(run(agent_run))
+    response = asyncio.run(run(module_run))
     logger.info(f"Final Response: {response}")

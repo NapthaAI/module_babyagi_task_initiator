@@ -6,6 +6,7 @@ from naptha_sdk.schemas import AgentDeployment, AgentRunInput
 from naptha_sdk.utils import get_logger
 import json
 from naptha_sdk.user import sign_consumer_id
+from naptha_sdk.inference import InferenceClient
 import asyncio
 from typing import Dict
 from babyagi_task_initiator.schemas import TaskList
@@ -16,6 +17,7 @@ logger = get_logger(__name__)
 class TaskInitiatorAgent:
     def __init__(self, agent_deployment: AgentDeployment):
         self.agent_deployment = agent_deployment
+        self.node = InferenceClient(self.deployment.node)
 
         self.user_message_template = """
                 You are given the following task: {{task}}. The goal is to accomplish the following objective: {{objective}}.
@@ -68,7 +70,7 @@ class TaskInitiatorAgent:
             'response_format': schema
         }
 
-        response = await naptha.node.run_inference(
+        response = await self.node.run_inference(
             input_
         )
 

@@ -8,7 +8,7 @@ import json
 from naptha_sdk.user import sign_consumer_id
 import asyncio
 from typing import Dict
-from schemas import TaskList
+from babyagi_task_initiator.schemas import TaskList
 
 load_dotenv()
 logger = get_logger(__name__)

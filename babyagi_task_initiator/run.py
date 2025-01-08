@@ -15,8 +15,8 @@ load_dotenv()
 logger = get_logger(__name__)
 
 class TaskInitiatorAgent:
-    def __init__(self, agent_deployment: AgentDeployment):
-        self.agent_deployment = agent_deployment
+    def __init__(self, deployment: AgentDeployment):
+        self.deployment = deployment
         self.node = InferenceClient(self.deployment.node)
 
         self.user_message_template = """
@@ -44,12 +44,12 @@ class TaskInitiatorAgent:
 
         # Prepare messages
         messages = [
-            {"role": "system", "content": json.dumps(self.agent_deployment.config.system_prompt)},
+            {"role": "system", "content": json.dumps(self.deployment.config.system_prompt)},
             {"role": "user", "content": user_prompt}
         ]
 
         # Prepare LLM configuration
-        llm_config = self.agent_deployment.config.llm_config
+        llm_config = self.deployment.config.llm_config
 
         def get_openai_structured_schema():
             return {

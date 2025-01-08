@@ -14,7 +14,7 @@ from babyagi_task_initiator.schemas import TaskList
 load_dotenv()
 logger = get_logger(__name__)
 
-class BabyAGITaskInitiator:
+class BabyAGITaskInitiatorAgent:
     def __init__(self, deployment: AgentDeployment):
         self.deployment = deployment
         self.node = InferenceClient(self.deployment.node)
@@ -87,7 +87,7 @@ async def run(module_run: Dict, *args, **kwargs):
     module_run = AgentRunInput(**module_run)
     module_run.inputs = InputSchema(**module_run.inputs)
     logger.info(f"Running with inputs {module_run.inputs.tool_name}")
-    task_initiator_agent = TaskInitiatorAgent(module_run.deployment)
+    task_initiator_agent = BabyAGITaskInitiatorAgent(module_run.deployment)
     method = getattr(task_initiator_agent, module_run.inputs.tool_name, None)
     return await method(module_run.inputs)
 
